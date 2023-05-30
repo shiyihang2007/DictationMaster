@@ -61,7 +61,6 @@ namespace Practice {
     string dictionary;
     vector<tuple<string, string, int>> v;
 
-    void loadInfo();
     void loadDict();
     void judge(const string & /*s*/, int /*pos*/);
     void getPos(int & /*pos*/, int /*sum*/);
@@ -74,12 +73,17 @@ namespace Dictation {
     vector<pair<string, string>> v;
     string dictionary;
 
+    void loadDict();
     void main();
 } // namespace Dictation
 
 auto main() -> int {
 #ifdef _WIN32
+#ifdef ANSI
+    system("chcp 936");
+#else
     system("chcp 65001");
+#endif
     system("cls");
 #endif
     loadInfo();
@@ -219,43 +223,46 @@ void Practice::main() {
     cin.get();
 }
 
+void Dictation::loadDict() {
+    ifstream din(dictionary.c_str());
+    string s;
+    for (int line = 1; getline(din, s); line++) {
+        if (s == "\n" || s == "\r" || s == "\r\n") {
+            continue;
+        }
+        int pos = -1;
+        for (int i = 0; i < static_cast<int>(s.length()); i++) {
+            if (s[i] == ':') {
+                pos = i;
+                break;
+            }
+        }
+        if (pos == -1) {
+            systemClear();
+            cout << infoErrorDictLine << line << endl;
+            return;
+        }
+        v.emplace_back(s.substr(0, pos - 1), s.substr(pos + 2));
+    }
+}
+
 void Dictation::main() {
-    puts("请选择词库");
+    cout << infoChooseDict << endl;
     cin >> dictionary;
     ifstream din(dictionary.c_str());
-    {
-        string s;
-        for (int line = 1; getline(din, s); line++) {
-            if (s == "\n" || s == "\r" || s == "\r\n") {
-                continue;
-            }
-            int pos = -1;
-            for (int i = 0; i < static_cast<int>(s.length()); i++) {
-                if (s[i] == ':') {
-                    pos = i;
-                    break;
-                }
-            }
-            if (pos == -1) {
-                systemClear();
-                printf("词典第 %d 行出错。\n程序停止运行。\n", line);
-                return;
-            }
-            v.emplace_back(s.substr(0, pos - 1), s.substr(pos + 2));
-        }
-    }
+    loadDict();
     systemClear();
-    puts("词典加载成功。");
-    puts("==预览==");
-    for (const auto &i : v) {
-        printf("%s : %s\n", i.second.c_str(), i.first.c_str());
+    cout << infoPreview << endl;
+    for (auto i : v) {
+        cout << get<1>(i).c_str() << " : ";
+        cout << get<0>(i).c_str() << endl;
     }
-    puts("输入回车开始默写。");
+    cout << infoPause << endl;
     cin.get();
     cin.get();
     for (const auto &i : v) {
         systemClear();
-        printf("%s\n", i.second.c_str());
+        cout << i.second.c_str() << endl;
         string s;
         do {
             getline(cin, s);
@@ -273,16 +280,18 @@ void Dictation::main() {
             wrong.push_back(i);
         }
     }
-    printf("你的得分为：%dpts.\n",
-           static_cast<int>(floor(static_cast<double>(ac) / num * 100)));
+    cout << "Your Score: "
+         << static_cast<int>(floor(static_cast<double>(ac) / num * 100))
+         << "pts." << endl;
     if (ac != num) {
-        puts("你错误的题目：");
+        cout << "Wrong Answer: " << endl;
         for (auto i : wrong) {
-            printf("%s\n你的答案为：%s\n正确答案为：%s\n\n",
-                   v[i].second.c_str(), res[i].c_str(), v[i].first.c_str());
+            cout << v[i].second.c_str() << endl;
+            cout << "Your: " << res[i].c_str() << endl;
+            cout << "Answer: " << v[i].first.c_str() << endl;
         }
     }
     else {
-        puts("膜拜 AK King! /bx/bx/bx");
+        cout << "/bx/bx/bx stO AK king Orz /bx/bx/bx" << endl;
     }
 }
