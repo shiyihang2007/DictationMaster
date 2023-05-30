@@ -63,8 +63,8 @@ namespace Practice {
 
     void loadInfo();
     void loadDict();
-    void judge(const string &, int);
-    void getPos(int &, int);
+    void judge(const string & /*s*/, int /*pos*/);
+    void getPos(int & /*pos*/, int /*sum*/);
     void main();
 } // namespace Practice
 
