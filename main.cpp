@@ -12,6 +12,10 @@
 #include <tuple>
 #include <vector>
 
+#include "yaml-cpp/node/node.h"
+#include "yaml-cpp/node/parse.h"
+#include "yaml-cpp/yaml.h"
+
 using namespace std;
 
 mt19937 gen(chrono::system_clock::now().time_since_epoch().count());
@@ -23,11 +27,44 @@ void systemClear() {
 #endif
 }
 
+string infoUsage;
+string infoChooseMode;
+string infoChooseDict;
+string infoInputValue;
+string infoErrorDictLine;
+string infoPreview;
+string infoPause;
+string infoEndup;
+
+void loadInfo() {
+    YAML::Node infoIn;
+    string infoYaml =
+#ifdef ANSI
+        "../plain/info_ansi.yaml"
+#else
+        "../plain/info_utf_8.yaml"
+#endif
+        ;
+    infoIn = YAML::LoadFile(infoYaml);
+    infoUsage = infoIn["Usage"].as<string>();
+    infoChooseMode = infoIn["ChooseMode"].as<string>();
+    infoChooseDict = infoIn["ChooseDict"].as<string>();
+    infoInputValue = infoIn["InputValue"].as<string>();
+    infoErrorDictLine = infoIn["ErrorDictLine"].as<string>();
+    infoPreview = infoIn["Preview"].as<string>();
+    infoPause = infoIn["Pause"].as<string>();
+    infoEndup = infoIn["Endup"].as<string>();
+}
+
 namespace Practice {
     int st, acval, waval, num, ac, lst = -1;
     string dictionary;
     vector<tuple<string, string, int>> v;
 
+    void loadInfo();
+    void loadDict();
+    void judge(const string &, int);
+    void getPos(int &, int);
     void main();
 } // namespace Practice
 
@@ -40,39 +77,16 @@ namespace Dictation {
     void main();
 } // namespace Dictation
 
-string infoUsage;
-string infoChooseMode;
-string infoChooseDict;
-
-auto init() -> void {
-    auto readPlainText = [&](ifstream &fin, string &str,
-                             const char *filename) -> void {
-        string tmp;
-        if (fin.is_open()) {
-            fin.close();
-        }
-        fin.open(filename);
-        while (!fin.eof()) {
-            getline(fin, tmp);
-            str += tmp + "\n";
-        }
-        fin.close();
-    };
-    ifstream fin;
-    readPlainText(fin, infoUsage, "./plain/infoUsage.txt");
-    readPlainText(fin, infoChooseMode, "./plain/infoChooseMode.txt");
-    readPlainText(fin, infoChooseDict, "./plain/infoChooseDict.txt");
-}
-
 auto main() -> int {
 #ifdef _WIN32
     system("chcp 65001");
     system("cls");
 #endif
-    cout << infoUsage;
+    loadInfo();
+    cout << infoUsage << endl;
     cin.get();
     systemClear();
-    cout << infoChooseMode;
+    cout << infoChooseMode << endl;
     int x;
     cin >> x;
     systemClear();
@@ -85,40 +99,81 @@ auto main() -> int {
     return 0;
 }
 
-void Practice::main() {
-    puts("请选择词库");
-    cin >> dictionary;
+void Practice::loadDict() {
     ifstream din(dictionary.c_str());
-    puts("请输入加权");
-    scanf("%d%d%d", &st, &acval, &waval);
-    {
-        string s;
-        for (int line = 1; getline(din, s); line++) {
-            if (s == "\n" || s == "\r" || s == "\r\n") {
-                continue;
-            }
-            int pos = -1;
-            for (int i = 0; i < static_cast<int>(s.length()); i++) {
-                if (s[i] == ':') {
-                    pos = i;
-                    break;
-                }
-            }
-            if (pos == -1) {
-                systemClear();
-                printf("词典第 %d 行出错。\n程序停止运行。\n", line);
-                return;
-            }
-            v.emplace_back(s.substr(0, pos - 1), s.substr(pos + 2), st);
+    string s;
+    for (int line = 1; getline(din, s); line++) {
+        if (s == "\n" || s == "\r" || s == "\r\n") {
+            continue;
         }
+        int pos = -1;
+        for (int i = 0; i < static_cast<int>(s.length()); i++) {
+            if (s[i] == ':') {
+                pos = i;
+                break;
+            }
+        }
+        if (pos == -1) {
+            systemClear();
+            cout << infoErrorDictLine << line << endl;
+            return;
+        }
+        v.emplace_back(s.substr(0, pos - 1), s.substr(pos + 2), st);
     }
+}
+
+void Practice::getPos(int &pos, int sum) {
+    int rnd = static_cast<int>(gen()) % sum + 1;
+    int tmp = 0;
+    for (int i = 0; i < static_cast<int>(v.size()); i++) {
+        if (rnd <= tmp + get<2>(v[i])) {
+            pos = i;
+            break;
+        }
+        tmp += get<2>(v[i]);
+    }
+}
+
+void Practice::judge(const string &s, int pos) {
+
+    if (s == get<0>(v[pos])) {
+        ac++;
+        get<2>(v[pos]) = max(get<2>(v[pos]) - acval, 0);
+        cout << "Accepted." << endl;
+    }
+    else if (s == get<0>(v[pos]) + " /pass") {
+        ac += get<2>(v[pos]);
+        num += get<2>(v[pos]) - 1;
+        get<2>(v[pos]) = 0;
+        cout << "Accepted and passed." << endl;
+    }
+    else if (s == "/skip") {
+        num--;
+    }
+    else if (s + "." == get<0>(v[pos])) {
+        cout << "You forget the '.'! /cf/cf/cf" << endl;
+        ac++;
+    }
+    else {
+        get<2>(v[pos]) += waval;
+        cout << "Wrong. The answer is:";
+        cout << get<0>(v[pos]).c_str() << endl;
+    }
+}
+
+void Practice::main() {
+    cout << infoChooseDict << endl;
+    cin >> dictionary;
+    cout << infoInputValue << endl;
+    cin >> st >> acval >> waval;
     systemClear();
-    puts("词典加载成功。");
-    puts("==预览==");
+    loadDict();
+    cout << infoPreview << endl;
     for (auto i : v) {
-        printf("%s : %s\n", get<1>(i).c_str(), get<0>(i).c_str());
+        cout << get<1>(i).c_str() << " : ";
+        cout << get<0>(i).c_str() << endl;
     }
-    puts("输入回车开始默写。");
+    cout << infoPause << endl;
     cin.get();
     cin.get();
     while (1) {
@@ -130,68 +185,38 @@ void Practice::main() {
             break;
         }
         int pos = -1;
-        {
-            int rnd = gen() % sum + 1;
-            int tmp = 0;
-            for (int i = 0; i < static_cast<int>(v.size()); i++) {
-                if (rnd <= tmp + get<2>(v[i])) {
-                    pos = i;
-                    break;
-                }
-                else {
-                    tmp += get<2>(v[i]);
-                }
-            }
-        }
+        getPos(pos, sum);
         if (pos == lst && get<2>(v[pos]) != sum) {
             continue;
         }
         lst = pos;
         systemClear();
-        printf("%s (value: %d, sum: %d)\n", get<1>(v[pos]).c_str(),
-               get<2>(v[pos]), sum);
+        cout << get<1>(v[pos]).c_str();
+        cout << " (value: " << get<2>(v[pos]);
+        cout << ", sum: " << sum;
         string s;
         do {
             getline(cin, s);
         } while (s == "\n" || s == "\r" || s == "\r\n");
-        puts("");
+        cout << endl;
         while (s.back() == ' ') {
             s.pop_back();
         }
-        if (s == get<0>(v[pos])) {
-            ac++;
-            get<2>(v[pos]) = max(get<2>(v[pos]) - acval, 0);
-            puts("Accepted.");
-        }
-        else if (s == get<0>(v[pos]) + " /pass") {
-            ac += get<2>(v[pos]);
-            num += get<2>(v[pos]) - 1;
-            get<2>(v[pos]) = 0;
-            puts("Accepted and passed.");
-        }
-        else if (s == "/finish") {
+        if (s == "/finish") {
             break;
         }
-        else if (s == "/skip") {
-            num--;
-        }
-        else if (s + "." == get<0>(v[pos])) {
-            puts("不喜欢加句号是这样的/cf/cf/cf"), ac++;
-        }
-        else {
-            get<2>(v[pos]) += waval;
-            puts("Wrong. The answer is:");
-            printf("%s\n", get<0>(v[pos]).c_str());
-        }
+        judge(s, pos);
         num++;
-        puts("\n按回车继续");
+        cout << infoPause << endl;
         getchar();
     }
     systemClear();
-    puts("默写结束！");
-    printf("完成默写使用次数：%d, 正确次数：%d, 正确率: %.1lf%%\n", num, ac,
-           static_cast<double>(ac) / num * 100);
-    puts("按回车结束程序");
+    cout << infoEndup << endl;
+    cout << "All: " << num << endl;
+    cout << "AC: " << ac << endl;
+    cout << "ACC: " << static_cast<double>(ac) / num * 100.0 << endl;
+    cout << infoPause << endl;
+    cin.get();
 }
 
 void Dictation::main() {
